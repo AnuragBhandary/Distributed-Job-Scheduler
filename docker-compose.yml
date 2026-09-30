@@ -1,0 +1,94 @@
+# Full stack: PostgreSQL, Redis, migrations, API, scheduler and 3 worker replicas.
+#   docker compose up -d --build
+#   curl -H "X-API-Key: $JOBQ_DEV_KEY" localhost:8000/v1/stats
+# The bootstrap key below is for local development only.
+
+x-jobq-env: &jobq-env
+  JOBQ_DATABASE_URL: postgresql://jobq:jobq@postgres:5432/jobq
+  JOBQ_REDIS_URL: redis://redis:6379/0
+  JOBQ_LOG_LEVEL: INFO
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jobq
+      POSTGRES_PASSWORD: jobq
+      POSTGRES_DB: jobq
+    command: ["postgres", "-c", "max_connections=300", "-c", "shared_buffers=256MB"]
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobq -d jobq"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    ports: ["6379:6379"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build: .
+    image: jobq:latest
+    command: ["migrate"]
+    environment: *jobq-env
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    image: jobq:latest
+    command: ["api", "--workers", "2"]
+    environment:
+      <<: *jobq-env
+      JOBQ_BOOTSTRAP_API_KEY: ${JOBQ_DEV_KEY:-jq_0000000000de_local-dev-key-not-for-production}
+      JOBQ_DEFAULT_RATE_PER_S: "1000"
+      JOBQ_DEFAULT_BURST: "2000"
+    ports: ["8000:8000"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  scheduler:
+    image: jobq:latest
+    command: ["scheduler"]
+    environment:
+      <<: *jobq-env
+      JOBQ_METRICS_PORT: "9100"
+      JOBQ_SWEEP_AFTER_S: "10"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+
+  worker:
+    image: jobq:latest
+    command: ["worker", "--tasks", "jobq.examples.tasks", "--concurrency", "32"]
+    environment:
+      <<: *jobq-env
+      JOBQ_METRICS_PORT: "9100"
+      JOBQ_LEASE_S: "10"
+      JOBQ_HEARTBEAT_INTERVAL_S: "3"
+    stop_grace_period: 30s
+    deploy:
+      replicas: 3
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  redisdata:

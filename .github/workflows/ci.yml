@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: jobq
+          POSTGRES_PASSWORD: jobq
+          POSTGRES_DB: jobq
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U jobq" --health-interval 2s --health-timeout 3s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - name: Tests (unit, integration, multi-process chaos) with a 90% coverage gate
+        run: uv run pytest --cov --cov-report=term --cov-fail-under=90
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image and run the compose stack end to end
+        run: |
+          docker compose up -d --build --wait api scheduler worker
+          KEY=jq_0000000000de_local-dev-key-not-for-production
+          ID=$(curl -sf -X POST localhost:8000/v1/jobs -H "X-API-Key: $KEY" \
+                 -H 'Content-Type: application/json' \
+                 -d '{"task":"examples.fib","args":[30]}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+          for _ in $(seq 1 30); do
+            STATUS=$(curl -sf localhost:8000/v1/jobs/$ID -H "X-API-Key: $KEY" | python3 -c 'import sys,json;print(json.load(sys.stdin)["status"])')
+            [ "$STATUS" = succeeded ] && echo "job $ID succeeded" && exit 0
+            sleep 1
+          done
+          docker compose logs
+          exit 1
