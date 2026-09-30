@@ -36,9 +36,7 @@ async def test_examples_through_worker(
             "dead": [
                 await enqueue(pool, redis, key, "examples.fail", max_attempts=3),
                 await enqueue(pool, redis, key, "examples.flaky", p_fail=1.0, max_attempts=2),
-                await enqueue(
-                    pool, redis, key, "examples.ledger", 1, p_fail=1.0, max_attempts=1
-                ),
+                await enqueue(pool, redis, key, "examples.ledger", 1, p_fail=1.0, max_attempts=1),
             ],
         }
 

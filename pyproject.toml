@@ -64,6 +64,7 @@ exclude_also = [
 line-length = 100
 target-version = "py312"
 src = ["src", "tests", "bench"]
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "SIM", "RUF"]

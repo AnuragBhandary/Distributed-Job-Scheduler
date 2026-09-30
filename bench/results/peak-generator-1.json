@@ -1,0 +1,76 @@
+{
+  "label": "peak-generator-1",
+  "timestamp": "2026-09-30T11:43:41.448666+00:00",
+  "machine": {
+    "platform": "Linux-6.8.0-117-generic-aarch64-with-glibc2.41",
+    "python": "3.12.14"
+  },
+  "config": {
+    "url": "http://api:8000",
+    "dsn": "postgresql://jobq:jobq@postgres:5432/jobq",
+    "jobs": 20000,
+    "rate": 600000.0,
+    "concurrency": 64,
+    "work_ms": 0.0,
+    "p_fail": 0.0,
+    "max_attempts": 5,
+    "delayed_fraction": 0.0,
+    "chaos_interval": 0,
+    "chaos_restart_after": 5,
+    "settle_timeout": 900,
+    "seed": 1,
+    "label": "peak-generator-1",
+    "out": "/bench/results"
+  },
+  "submission": {
+    "accepted": 20000,
+    "errors": {},
+    "duration_s": 38.7,
+    "achieved_rate_per_min": 31039.3,
+    "enqueue_latency_ms": {
+      "count": 20000,
+      "mean": 121.55,
+      "p50": 78.56,
+      "p95": 372.83,
+      "p99": 604.86,
+      "max": 1731.29
+    },
+    "enqueue_latency_from_intended_start_ms": {
+      "count": 20000,
+      "mean": 18170.92,
+      "p50": 16997.18,
+      "p95": 35204.14,
+      "p99": 36393.18,
+      "max": 36677.02
+    }
+  },
+  "chaos_events": [],
+  "audit": {
+    "jobs": 20000,
+    "status": {
+      "succeeded": 20000
+    },
+    "unrecovered_failures": 0,
+    "unrecovered_failure_rate_pct": 0.0,
+    "ledger_rows": 20000,
+    "ledger_distinct_jobs": 20000,
+    "duplicate_effects": 0,
+    "succeeded_without_effect": 0,
+    "effects_for_unsucceeded_jobs": 0,
+    "executions": {
+      "succeeded": 20000
+    },
+    "attempts_histogram": {
+      "1": 20000
+    },
+    "pickup_latency_ms": {
+      "count": 20000,
+      "mean": 1.57,
+      "p50": 1.2,
+      "p95": 3.49,
+      "p99": 8.43,
+      "max": 38.4
+    },
+    "wall_clock_s": 38.6
+  }
+}

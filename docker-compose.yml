@@ -45,7 +45,7 @@ services:
 
   api:
     image: jobq:latest
-    command: ["api", "--workers", "2"]
+    command: ["api", "--workers", "${JOBQ_API_WORKERS:-2}"]
     environment:
       <<: *jobq-env
       JOBQ_BOOTSTRAP_API_KEY: ${JOBQ_DEV_KEY:-jq_0000000000de_local-dev-key-not-for-production}

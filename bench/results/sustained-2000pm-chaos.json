@@ -1,0 +1,312 @@
+{
+  "label": "sustained-2000pm-chaos",
+  "timestamp": "2026-09-30T11:34:49.999033+00:00",
+  "machine": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.14"
+  },
+  "config": {
+    "url": "http://localhost:8000",
+    "dsn": "postgresql://jobq:jobq@localhost:5432/jobq",
+    "jobs": 50000,
+    "rate": 2000.0,
+    "concurrency": 64,
+    "work_ms": 250.0,
+    "p_fail": 0.05,
+    "max_attempts": 5,
+    "delayed_fraction": 0.1,
+    "chaos_interval": 60.0,
+    "chaos_restart_after": 5,
+    "settle_timeout": 900,
+    "seed": 42,
+    "label": "sustained-2000pm-chaos",
+    "out": "bench/results"
+  },
+  "submission": {
+    "accepted": 50000,
+    "errors": {},
+    "duration_s": 1500.0,
+    "achieved_rate_per_min": 2000.0,
+    "enqueue_latency_ms": {
+      "count": 50000,
+      "mean": 4.65,
+      "p50": 4.48,
+      "p95": 7.07,
+      "p99": 8.17,
+      "max": 241.38
+    },
+    "enqueue_latency_from_intended_start_ms": {
+      "count": 50000,
+      "mean": 6.05,
+      "p50": 5.51,
+      "p95": 8.14,
+      "p99": 9.52,
+      "max": 278.16
+    }
+  },
+  "chaos_events": [
+    {
+      "t": "2026-09-30T11:10:22.438532+00:00",
+      "action": "SIGKILL",
+      "container": "1a11e214f1a9"
+    },
+    {
+      "t": "2026-09-30T11:10:27.524272+00:00",
+      "action": "restart",
+      "container": "1a11e214f1a9"
+    },
+    {
+      "t": "2026-09-30T11:11:27.649551+00:00",
+      "action": "SIGKILL",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:11:32.744235+00:00",
+      "action": "restart",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:12:32.898312+00:00",
+      "action": "SIGKILL",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:12:37.981511+00:00",
+      "action": "restart",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:13:38.210176+00:00",
+      "action": "SIGKILL",
+      "container": "1a11e214f1a9"
+    },
+    {
+      "t": "2026-09-30T11:13:43.298561+00:00",
+      "action": "restart",
+      "container": "1a11e214f1a9"
+    },
+    {
+      "t": "2026-09-30T11:14:43.458882+00:00",
+      "action": "SIGKILL",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:14:48.540659+00:00",
+      "action": "restart",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:15:48.758206+00:00",
+      "action": "SIGKILL",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:15:53.838348+00:00",
+      "action": "restart",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:16:54.065522+00:00",
+      "action": "SIGKILL",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:16:59.146162+00:00",
+      "action": "restart",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:17:59.370542+00:00",
+      "action": "SIGKILL",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:18:04.464029+00:00",
+      "action": "restart",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:19:04.614316+00:00",
+      "action": "SIGKILL",
+      "container": "1a11e214f1a9"
+    },
+    {
+      "t": "2026-09-30T11:19:09.707434+00:00",
+      "action": "restart",
+      "container": "1a11e214f1a9"
+    },
+    {
+      "t": "2026-09-30T11:20:09.880588+00:00",
+      "action": "SIGKILL",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:20:14.970978+00:00",
+      "action": "restart",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:21:15.193268+00:00",
+      "action": "SIGKILL",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:21:20.276397+00:00",
+      "action": "restart",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:22:20.445121+00:00",
+      "action": "SIGKILL",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:22:25.533850+00:00",
+      "action": "restart",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:23:25.705550+00:00",
+      "action": "SIGKILL",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:23:30.785877+00:00",
+      "action": "restart",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:24:30.950744+00:00",
+      "action": "SIGKILL",
+      "container": "1a11e214f1a9"
+    },
+    {
+      "t": "2026-09-30T11:24:36.025995+00:00",
+      "action": "restart",
+      "container": "1a11e214f1a9"
+    },
+    {
+      "t": "2026-09-30T11:25:36.263740+00:00",
+      "action": "SIGKILL",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:25:41.352185+00:00",
+      "action": "restart",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:26:41.572350+00:00",
+      "action": "SIGKILL",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:26:46.659236+00:00",
+      "action": "restart",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:27:46.863264+00:00",
+      "action": "SIGKILL",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:27:51.963620+00:00",
+      "action": "restart",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:28:52.251720+00:00",
+      "action": "SIGKILL",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:28:57.349165+00:00",
+      "action": "restart",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:29:57.523118+00:00",
+      "action": "SIGKILL",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:30:02.599971+00:00",
+      "action": "restart",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:31:02.840234+00:00",
+      "action": "SIGKILL",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:31:07.932165+00:00",
+      "action": "restart",
+      "container": "f4c201d28330"
+    },
+    {
+      "t": "2026-09-30T11:32:08.068060+00:00",
+      "action": "SIGKILL",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:32:13.156422+00:00",
+      "action": "restart",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:33:13.378486+00:00",
+      "action": "SIGKILL",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:33:18.460367+00:00",
+      "action": "restart",
+      "container": "db2707d13e14"
+    },
+    {
+      "t": "2026-09-30T11:34:18.675965+00:00",
+      "action": "SIGKILL",
+      "container": "1a11e214f1a9"
+    },
+    {
+      "t": "2026-09-30T11:34:23.757454+00:00",
+      "action": "restart",
+      "container": "1a11e214f1a9"
+    }
+  ],
+  "audit": {
+    "jobs": 50000,
+    "status": {
+      "succeeded": 50000
+    },
+    "unrecovered_failures": 0,
+    "unrecovered_failure_rate_pct": 0.0,
+    "ledger_rows": 50000,
+    "ledger_distinct_jobs": 50000,
+    "duplicate_effects": 0,
+    "succeeded_without_effect": 0,
+    "effects_for_unsucceeded_jobs": 0,
+    "executions": {
+      "succeeded": 50000,
+      "lease_expired": 41,
+      "failed": 2633
+    },
+    "attempts_histogram": {
+      "1": 47462,
+      "2": 2408,
+      "3": 124,
+      "4": 6
+    },
+    "pickup_latency_ms": {
+      "count": 47462,
+      "mean": 14.41,
+      "p50": 1.59,
+      "p95": 130.72,
+      "p99": 228.69,
+      "max": 256.41
+    },
+    "wall_clock_s": 1524.7
+  }
+}
