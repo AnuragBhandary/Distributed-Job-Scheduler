@@ -161,6 +161,49 @@ async def job_counts(db: Executor, api_key_id: int) -> list[asyncpg.Record]:
     )
 
 
+async def recent_workers(db: Executor, api_key_id: int, window_s: float) -> list[asyncpg.Record]:
+    """Workers that ran this key's jobs recently (or are running one now), busiest first."""
+    return await db.fetch(
+        """
+        SELECT e.worker_id,
+               count(*) FILTER (WHERE e.status = 'running') AS running,
+               count(*) FILTER (WHERE e.status = 'succeeded') AS succeeded,
+               count(*) FILTER (WHERE e.status NOT IN ('running', 'succeeded')) AS failed,
+               max(coalesce(e.finished_at, e.started_at)) AS last_seen
+        FROM executions e JOIN jobs j ON j.id = e.job_id
+        WHERE j.api_key_id = $1
+          AND (e.started_at > now() - make_interval(secs => $2) OR e.status = 'running')
+        GROUP BY e.worker_id
+        ORDER BY running DESC, last_seen DESC
+        """,
+        api_key_id,
+        window_s,
+    )
+
+
+async def throughput(
+    db: Executor, api_key_id: int, window_s: float, bucket_s: int
+) -> list[asyncpg.Record]:
+    """Finished attempts per time bucket: succeeded vs failed (failed, timed out, lease expired,
+    fenced, interrupted). Retries show up as failed attempts followed by a success."""
+    return await db.fetch(
+        """
+        SELECT date_bin(make_interval(secs => $3), e.finished_at, 'epoch') AS bucket,
+               count(*) FILTER (WHERE e.status = 'succeeded') AS succeeded,
+               count(*) FILTER (WHERE e.status <> 'succeeded') AS failed
+        FROM executions e JOIN jobs j ON j.id = e.job_id
+        WHERE j.api_key_id = $1
+          -- bounds the index range scan; attempts that ran over an hour are left out
+          AND e.started_at > now() - make_interval(secs => $2) - interval '1 hour'
+          AND e.finished_at > now() - make_interval(secs => $2)
+        GROUP BY bucket ORDER BY bucket
+        """,
+        api_key_id,
+        window_s,
+        bucket_s,
+    )
+
+
 # ---------------------------------------------------------------------------------------------
 # Worker side
 # ---------------------------------------------------------------------------------------------

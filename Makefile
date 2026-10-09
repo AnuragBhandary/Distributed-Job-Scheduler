@@ -1,4 +1,4 @@
-.PHONY: install up down infra test lint typecheck check bench bench-smoke
+.PHONY: install up down infra test lint typecheck check bench bench-smoke web web-dev web-test e2e
 
 install:            ## install dependencies (needs uv)
 	uv sync
@@ -29,3 +29,15 @@ bench-smoke: up    ## ~1 minute
 bench: up          ## the resume numbers: 50k jobs at 2,000/min with a worker killed every minute
 	uv run python bench/run_benchmark.py --jobs 50000 --rate 2000 --work-ms 250 \
 		--p-fail 0.05 --chaos-interval 60 --label sustained-2000pm-chaos
+
+web:                ## build the React dashboard into the package (the API serves it at /)
+	cd web && npm ci && npm run build
+
+web-dev:            ## Vite dev server on :5173, proxying /v1 to the API on :8000
+	cd web && npm run dev
+
+web-test:           ## lint, typecheck, unit + component tests with coverage
+	cd web && npm run lint && npm run typecheck && npm run coverage
+
+e2e: up             ## browser tests: a worker SIGKILLed mid-run, DLQ requeue (under a minute)
+	cd web && npx playwright test

@@ -95,10 +95,30 @@ within the same 40 s window in which they were submitted.
   ledger, joined against job status. It also checks succeeded jobs with no effect and effects for
   jobs that did not succeed.
 
+## 3. Dashboard end to end (Playwright)
+
+`web/e2e/dashboard.spec.ts` against the compose stack (API, scheduler, 3 workers × 32
+concurrency, `JOBQ_LEASE_S=10`), in headless Chromium. It signs in, enqueues N `examples.ledger`
+jobs (3 s of work each), waits until one worker is running more than 5 of them, and SIGKILLs
+that worker's container. Then it waits for every job to succeed and audits PostgreSQL. Last, it
+opens a taken-over job in the dashboard: attempt 1 must show `lease expired` on the killed
+worker, and the last attempt `succeeded`.
+
+| Run | Jobs | Killed | Jobs taken over (attempts > 1) | Ledger rows / distinct jobs | Result |
+|---|---|---|---|---|---|
+| 1 | 200 | worker-2 | 32 | 200 / 200 | passed |
+| 2 | 500 | worker-2 | 32 | 500 / 500 | passed |
+| 3 | 500 | worker-2 | 32 | 500 / 500 | passed |
+| 4 | 500 | worker-2 | 32 | 500 / 500 | passed |
+
+32 is the killed worker's full concurrency: every job it was running was taken over once its
+lease expired, and none was committed twice.
+
 ## Reproduce
 
 ```bash
 make up          # build and start the stack
 make bench       # run 1 (≈ 27 minutes)
 make bench-smoke # 2,000 jobs with chaos, about a minute
+make e2e         # run 3 with 200 jobs; E2E_JOBS=500 for the larger runs
 ```

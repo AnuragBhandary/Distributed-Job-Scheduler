@@ -245,7 +245,34 @@ Unknown task names are retryable on purpose: during a rolling deploy, a newer wo
   403, so ids cannot be probed.
 - Payload size limit (256 KiB, 413), strict validation of names/queues, non-root container.
 
-## 10. Scaling path and limitations
+## 10. The dashboard
+
+A React + TypeScript single-page app in `web/`, built into the Python package and served by the
+API at `/`. A catch-all route registered after every API route returns the page for client-side
+paths, and returns 404 for unknown `/v1/` paths, so a typo in an API call never gets HTML back.
+
+- **Polling, not push.** Counts, throughput and job state change continuously, but nobody needs
+  them within milliseconds. TanStack Query polls every 2 s (1 s on a pending job's page, stopping
+  once it is terminal), deduplicates requests and refetches when the tab regains focus. Push
+  (SSE from a PostgreSQL `LISTEN`) would be the next step if many people watched one deployment.
+- **Two endpoints for it.** `GET /v1/workers` and `GET /v1/stats/throughput` read only recent or
+  running executions. Migration 0003 indexes `executions (started_at)` and running executions
+  for that. Both are scoped to the caller's key like every other query.
+- **Auth.** The dashboard uses the same API keys as the SDK. The key is checked with a request
+  before it is kept, stored in `sessionStorage` (gone when the tab closes) and sent only as the
+  `X-API-Key` header to the same origin. A 401 signs the user out with the reason. Each signed-in
+  key gets its own query cache, so data never leaks between keys. Script injected into the page
+  could read the key; the API's per-key rate limits and revocation limit the damage, and a
+  production deployment would use short-lived session tokens in an `HttpOnly` cookie instead.
+- **Rendering stays pure.** "5 s ago" and "stale worker" are computed against each query's
+  fetch time (`dataUpdatedAt`), not `Date.now()`, so a render is a function of its data. The
+  React Compiler lint enforces this.
+- **Safe actions.** Cancel needs a second click to confirm. Every enqueue from the form carries a
+  fresh `Idempotency-Key`, so a double submit returns the same job. Bulk requeue runs 4 requests
+  at a time and reports failures per job. A job that is no longer dead returns 409 with the
+  reason, which the page shows.
+
+## 11. Scaling path and limitations
 
 **Where the bottleneck is.** PostgreSQL writes: a successful job costs one insert and two
 updates of its `jobs` row (plus one more update if it was scheduled for later) and one insert

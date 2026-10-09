@@ -36,6 +36,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/jobq"]
+# The built dashboard is git-ignored but must ship in the wheel (and the Docker image).
+artifacts = ["src/jobq/static/web"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

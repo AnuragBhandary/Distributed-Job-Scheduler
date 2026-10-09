@@ -245,3 +245,41 @@ def uuid_of(job: dict[str, Any]) -> Any:
     from uuid import UUID
 
     return UUID(job["id"])
+
+
+async def test_workers_and_throughput(client: httpx.AsyncClient, pool: asyncpg.Pool) -> None:
+    job = (await _enqueue(client)).json()
+    other = (await _enqueue(client)).json()
+    for attempt, (worker, status, finished) in enumerate(
+        [("w1", "failed", True), ("w2", "succeeded", True)], start=1
+    ):
+        await pool.execute(
+            """INSERT INTO executions (job_id, attempt, worker_id, lease_token, status,
+                                       finished_at)
+               VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN now() END)""",
+            uuid_of(job), attempt, worker, uuid4(), status, finished,
+        )  # fmt: skip
+    await pool.execute(
+        """INSERT INTO executions (job_id, attempt, worker_id, lease_token, status, started_at)
+           VALUES ($1, 1, 'w3', $2, 'running', now() - interval '2 hours')""",
+        uuid_of(other),
+        uuid4(),
+    )
+    workers = {w["worker_id"]: w for w in (await client.get("/v1/workers")).json()}
+    assert set(workers) == {"w1", "w2", "w3"}  # w3 started long ago but is still running
+    assert (workers["w1"]["failed"], workers["w2"]["succeeded"], workers["w3"]["running"]) == (
+        1,
+        1,
+        1,
+    )
+    data = (await client.get("/v1/stats/throughput", params={"bucket_s": 5})).json()
+    assert data["bucket_s"] == 5
+    buckets = data["buckets"]
+    assert sum(b["succeeded"] for b in buckets) == 1 and sum(b["failed"] for b in buckets) == 1
+    assert all(int(b["start"][17:19]) % 5 == 0 for b in buckets)  # aligned to 5 s
+
+
+async def test_dashboard_routes(client: httpx.AsyncClient) -> None:
+    page = await client.get("/jobs/123")
+    assert page.status_code == 200 and "<title>jobq" in page.text
+    assert (await client.get("/v1/no-such-route")).status_code == 404

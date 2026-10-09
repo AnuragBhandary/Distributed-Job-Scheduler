@@ -9,8 +9,13 @@ Jobs run now or on a schedule and retry with exponential backoff and jitter. Job
 their retries go to a dead-letter queue. Workers hold heartbeated **leases**, and every write is
 **fenced**, so a crashed or frozen worker can never commit a job twice.
 
-**Stack:** Python 3.12, asyncio, FastAPI, PostgreSQL (source of truth), Redis Streams
+It comes with a React dashboard for watching queues, throughput and workers, following any job's
+attempts, cancelling, enqueueing, and requeueing dead letters.
+
+**Backend:** Python 3.12, asyncio, FastAPI, PostgreSQL (source of truth), Redis Streams
 (dispatch) and Lua (rate limiting), Docker, GitHub Actions.
+**Frontend:** React 19, TypeScript, Vite, Tailwind CSS, TanStack Query, React Router, React Hook
+Form + Zod; tested with Vitest, Testing Library, MSW and Playwright.
 
 ### Measured results ([details](docs/BENCHMARKS.md))
 
@@ -20,6 +25,7 @@ their retries go to a dead-letter queue. Workers hold heartbeated **leases**, an
 | Duplicate side effects | **0** (audited in SQL: one ledger row per job) |
 | Enqueue latency | **p95 7.1 ms**, p99 8.2 ms |
 | Peak throughput (same laptop) | **≈ 1,500 jobs/s** end-to-end, pickup p95 3.5 ms |
+| Dashboard end to end (Playwright, 4 runs) | A worker SIGKILLed mid-run each time: **all 200–500 jobs succeeded with exactly one ledger row each**, and the UI showed the 32 taken-over jobs' `lease_expired` attempt then the success on another worker |
 
 ## Architecture
 
@@ -61,7 +67,36 @@ curl -s -X POST localhost:8000/v1/jobs -H "X-API-Key: $KEY" -H 'Content-Type: ap
 curl -s localhost:8000/v1/stats -H "X-API-Key: $KEY"
 ```
 
-Interactive API docs: http://localhost:8000/docs · Prometheus metrics: `/metrics`.
+Dashboard: http://localhost:8000 (sign in with the key above) · API docs: http://localhost:8000/docs
+· Prometheus metrics: `/metrics`.
+
+## Dashboard
+
+`web/` is a React + TypeScript app that the API serves at `/` (the Docker image builds it).
+
+- **Overview:** job counts by status and queue, throughput over the last 5 minutes (succeeded vs
+  failed attempts per 10 s), and the workers that ran your jobs recently, with quiet ones flagged.
+  It refreshes every 2 seconds.
+- **Jobs:** filter by status, queue and task. The filters live in the URL, so a view can be
+  shared. Pages load with "Load more" on the API's keyset cursor.
+- **Job:** arguments, result or error, and every attempt in order: which worker ran it, how long
+  it took, and why it failed (`lease_expired`, `fenced` and so on, in plain words). A pending job
+  can be cancelled after a confirmation step; a dead one can be requeued.
+- **Dead letters:** select several or all, requeue them four at a time, with progress and a list
+  of any that failed.
+- **New job:** a validated form (Zod) with presets for the example tasks. The JSON arguments are
+  checked before sending, and each submit carries a fresh `Idempotency-Key`, so a double click
+  or a retry cannot create two jobs.
+
+It signs in with an API key, checked against the API before being kept in `sessionStorage`. A
+rejected key (for example one revoked meanwhile) signs you out with the reason. Each key gets its
+own query cache, so signing out never shows another key's data.
+
+```bash
+make web-dev     # Vite on :5173 with hot reload, proxying /v1 to the API on :8000
+make web-test    # ESLint, tsc, 38 Vitest tests against an MSW fake of the API
+make e2e         # Playwright against the real stack (kills a worker on purpose)
+```
 
 ### Python SDK (Celery-style)
 
@@ -102,6 +137,8 @@ straight to the DLQ.
 | `GET` | `/v1/dlq` | Dead-letter queue |
 | `POST` | `/v1/dlq/{id}/requeue` | Retry a dead job with a fresh retry budget |
 | `GET` | `/v1/stats` | Job counts per queue and status |
+| `GET` | `/v1/stats/throughput` | Succeeded vs failed attempts per bucket over a window (dashboard chart) |
+| `GET` | `/v1/workers` | Workers that ran your jobs recently: running, done, failed, last seen |
 | `GET` | `/healthz`, `/readyz`, `/metrics` | Liveness, readiness (Postgres + Redis), Prometheus |
 
 Authenticate with `X-API-Key` or `Authorization: Bearer`. Rate limits come back in
@@ -111,7 +148,8 @@ Authenticate with `X-API-Key` or `Authorization: Bearer`. Rate limits come back 
 
 ```bash
 make infra   # Postgres + Redis in Docker
-make check   # ruff, mypy, 88 tests with coverage gate (94%)
+make check   # ruff, mypy, 90 tests with coverage gate (94%)
+make web-test && make e2e   # dashboard: 38 component tests (99% lines), 2 Playwright tests
 ```
 
 The tests run against real PostgreSQL and Redis, because the guarantees depend on real row
@@ -121,6 +159,12 @@ locking and stream semantics. **`tests/test_chaos.py`** starts real worker proce
   worker finishes them. Each of the 80 jobs has exactly one ledger row.
 - **Freezes a worker with SIGSTOP** until its 10 jobs are taken over, then SIGCONTs it. The
   "zombie" finishes all its handlers, but every write is fenced off: still exactly one row per job.
+
+**`web/e2e/dashboard.spec.ts`** does the same through the browser against the compose stack.
+It enqueues 200 ledger jobs, finds the worker running the most of them, `docker kill`s its
+container, and waits for every job to succeed. Then it counts ledger rows in PostgreSQL (one per
+job) and opens a taken-over job in the dashboard to check its `lease_expired` attempt. A second
+test enqueues through the form, then dead-letters three jobs and requeues them from the UI.
 
 ## Project layout
 
@@ -134,6 +178,12 @@ src/jobq/
   scheduler.py    promote / reap / sweep / purge / gauge loops
   client.py       Celery-style SDK
   backoff.py      full-jitter backoff and the retry-or-dead decision
+web/src/
+  api/            fetch wrapper, API key session, TanStack Query hooks (polling, mutations)
+  pages/          overview, jobs, job, dead letters, new job, sign in
+  components/     throughput chart (SVG), attempt timeline, job table, badges
+  test/fakeApi.ts in-memory fake of the REST API served through MSW
+web/e2e/          Playwright: worker SIGKILL takeover, form enqueue, DLQ requeue
 bench/            open-loop load generator + chaos monkey + database audit
 docs/             DESIGN.md, BENCHMARKS.md, INTERVIEW.md
 ```

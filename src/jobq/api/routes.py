@@ -27,6 +27,9 @@ from jobq.api.schemas import (
     JobStatus,
     QueueStats,
     Stats,
+    Throughput,
+    ThroughputBucket,
+    WorkerOut,
 )
 from jobq.auth import Principal
 
@@ -242,3 +245,32 @@ async def stats(
     for row in await repo.job_counts(state.pool, principal.id):
         queues.setdefault(row["queue"], {})[row["status"]] = row["count"]
     return Stats(queues=[QueueStats(queue=q, counts=c) for q, c in queues.items()])
+
+
+@router.get("/stats/throughput", response_model=Throughput, tags=["stats"])
+async def stats_throughput(
+    window_s: int = Query(default=300, ge=10, le=3600),
+    bucket_s: int = Query(default=10, ge=1, le=600),
+    principal: Principal = Depends(rate_limited),
+    state: AppState = Depends(get_state),
+) -> Throughput:
+    """Finished attempts per bucket over the last ``window_s`` seconds (the dashboard's chart)."""
+    rows = await repo.throughput(state.pool, principal.id, window_s, bucket_s)
+    return Throughput(
+        bucket_s=bucket_s,
+        buckets=[
+            ThroughputBucket(start=r["bucket"], succeeded=r["succeeded"], failed=r["failed"])
+            for r in rows
+        ],
+    )
+
+
+@router.get("/workers", response_model=list[WorkerOut], tags=["stats"])
+async def workers(
+    window_s: int = Query(default=300, ge=10, le=3600),
+    principal: Principal = Depends(rate_limited),
+    state: AppState = Depends(get_state),
+) -> list[WorkerOut]:
+    """Workers that ran this key's jobs in the last ``window_s`` seconds, or are running one."""
+    rows = await repo.recent_workers(state.pool, principal.id, window_s)
+    return [WorkerOut.model_validate(dict(r)) for r in rows]

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from importlib import resources
 
-from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from jobq import __version__
@@ -82,4 +84,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def prometheus_metrics() -> Response:
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+    _mount_dashboard(app)
     return app
+
+
+def _mount_dashboard(app: FastAPI) -> None:
+    """Serve the React dashboard (web/, built into the package) at / with client-side routes.
+    Registered last, so it only answers paths no API route matched."""
+    web = resources.files("jobq.static").joinpath("web")
+    built = web.joinpath("index.html").is_file()
+    if built:
+        app.mount("/assets", StaticFiles(directory=str(web.joinpath("assets"))), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def dashboard(path: str) -> HTMLResponse:
+        if path.startswith("v1/"):
+            raise HTTPException(404, "Not Found")
+        if not built:
+            return HTMLResponse(
+                "<!doctype html><title>jobq</title><p>The dashboard is not built. "
+                "Run <code>make web</code>, or use the Docker image.</p>"
+            )
+        return HTMLResponse(web.joinpath("index.html").read_text())

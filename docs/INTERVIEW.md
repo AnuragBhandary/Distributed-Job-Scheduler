@@ -19,6 +19,14 @@ behavioural deep dive. Numbers are in [BENCHMARKS.md](BENCHMARKS.md); reasoning 
 | 9 | `src/jobq/client.py` | Celery-style API; why retries are safe |
 | 10 | `tests/test_chaos.py` | SIGKILL and SIGSTOP experiments; what each assertion proves |
 | 11 | `bench/run_benchmark.py` | Open-loop load, coordinated omission, the audit queries |
+| 12 | `web/src/api/http.ts`, `session.ts` | Key handling, 401 → sign out, error details from FastAPI |
+| 13 | `web/src/api/queries.ts` | Query keys, polling intervals, infinite query + keyset cursor, mutations that invalidate |
+| 14 | `web/src/pages/JobPage.tsx`, `components/ExecutionTimeline.tsx` | What each attempt status means and how the page shows it |
+| 15 | `web/src/pages/NewJobPage.tsx` | Zod schema, React Hook Form, idempotency key per submit |
+| 16 | `web/src/test/fakeApi.ts`, `web/e2e/dashboard.spec.ts` | MSW fake vs real stack; what the SIGKILL e2e proves |
+
+**Do this by hand before an interview** (no AI): add a "retry rate" tile to the overview (failed
+÷ total attempts in 5 min) with a test, and a "copy job id" button on the job page.
 
 Exercise after each file: close it and re-derive the key statement or function on paper.
 
@@ -33,7 +41,10 @@ Exercise after each file: close it and re-derive the key statement or function o
 > effects commit in the same transaction as that fenced check, which gives exactly-once effects on
 > top of at-least-once execution. I proved it with chaos tests that SIGKILL workers and freeze
 > them with SIGSTOP, and with a 50,000-job benchmark that kills a worker every minute and then
-> audits the database for duplicates."
+> audits the database for duplicates. I also built the React and TypeScript dashboard on top. It
+> shows queues, throughput, workers, and every attempt of a job, and it can requeue dead letters.
+> A Playwright test kills a worker mid-run and checks in the browser that its jobs were taken over
+> and still committed exactly once."
 
 ## 3. Numbers to know cold
 
@@ -42,7 +53,9 @@ Exercise after each file: close it and re-derive the key statement or function o
 - Enqueue p95 7.1 ms / p99 8.2 ms at the sustained rate.
 - Peak ≈1,500 jobs/s end-to-end on one laptop; bottleneck = API CPU, not PostgreSQL fsync
   (`synchronous_commit=off` gave only +18%).
-- 88 tests, 94% coverage; CI gate at 90%.
+- 90 Python tests, 94% coverage; CI gate at 90%.
+- Dashboard: 38 Vitest tests (99% lines) against an MSW fake API; Playwright SIGKILL e2e passed
+  4/4 runs (200–500 jobs, the killed worker's 32 jobs taken over, 0 duplicate ledger rows).
 
 ## 4. Resume bullets → evidence
 
@@ -162,6 +175,41 @@ process pool).
 depend on real locking and stream semantics), multi-process chaos tests, and a benchmark whose
 audit is a SQL query any reviewer can re-run.
 
+### Dashboard
+
+**Why polling and not WebSockets/SSE?**
+Job counts and states change constantly but nobody needs them within 50 ms. Polling every 2 s
+with TanStack Query is simple, cacheable and stateless on the server. Requests are deduplicated
+across components, and it refetches when the tab regains focus. The streaming project is where
+push made sense, because there each event matters. Here I'd add SSE from a PostgreSQL `LISTEN`
+only if many people watched one deployment.
+
+**How does "Load more" stay correct while new jobs arrive?**
+The API pages on a keyset cursor `(created_at, id)`, not OFFSET, so a new job at the top can't
+shift a page and duplicate or skip rows. The page keeps its loaded pages and refreshes them
+while polling.
+
+**Where does the API key live, and what are the risks?**
+In `sessionStorage`, checked with a request before it's kept, and sent only as a header to the
+same origin. Injected script could read it, which is the main risk of keeping secrets in browser
+storage. Mitigations are per-key rate limits, revocation (a 401 signs you out) and no third-party
+scripts. In production I'd swap it for a short-lived session in an HttpOnly cookie.
+
+**Why is the time shown relative to `dataUpdatedAt` instead of `Date.now()`?**
+Rendering should be a pure function of the data. `Date.now()` makes a render differ each time,
+which the React Compiler lint flagged. Using the fetch time is also more honest, because "seen 5 s
+ago" means 5 s before this data was fetched.
+
+**How did you test the UI without the backend?**
+With MSW and an in-memory fake that follows the API's rules: auth, filters, keyset pages, cancel
+only pending jobs, requeue only dead ones, idempotency keys. Components make real `fetch` calls.
+The real backend is covered by Playwright against the compose stack, including killing a worker.
+
+**What happens if two people act on the same job?**
+The API's conditional updates decide. For example, a cancel when a worker has just claimed the job
+returns 409 "only pending jobs can be cancelled", and the page shows that message.
+`JobPage.test.tsx` reproduces it.
+
 ## 6. Amazon Leadership Principles stories
 
 Use STAR (Situation, Task, Action, Result). Keep each to about 2 minutes, and have the numbers ready.
@@ -181,6 +229,11 @@ Use STAR (Situation, Task, Action, Result). Keep each to about 2 minutes, and ha
   is optional for correctness, so it can be a small single node.
 - **Ownership / Are Right, A Lot**: The resume numbers were written as targets first. I built
   the benchmark to test them and committed to changing the resume if they didn't hold.
+- **Dive Deep (dashboard)**: *Zero running jobs.* The first demo showed 169 queued jobs and none
+  running. Before suspecting the UI, I checked the workers: they consume only the `default` queue,
+  and my demo script had put jobs on queues no worker listened to. The dashboard was right. I
+  cancelled the stranded jobs through the API and noted the case: a queue with jobs but no worker
+  is something an operator needs to see.
 - **Bias for Action**: Shipped a minimal end-to-end path (API → stream → worker) first, then added
   leases, retries, the DLQ and chaos testing incrementally, with tests at every step.
 
@@ -191,4 +244,5 @@ Use STAR (Situation, Task, Action, Result). Keep each to about 2 minutes, and ha
 3. Add worker lease + heartbeat + reaper; walk the SIGKILL story.
 4. Add the fencing token; walk the GC-pause story.
 5. Add the scheduler (promote, sweep) and the DLQ.
-6. Finish with the guarantees table (DESIGN.md §6) and the scaling path (§10).
+6. Finish with the guarantees table (DESIGN.md §6) and the scaling path (§11).
+7. Dashboard: polling with TanStack Query, the two recent-activity endpoints, key handling (§10).

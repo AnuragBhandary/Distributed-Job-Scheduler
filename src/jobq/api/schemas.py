@@ -76,3 +76,22 @@ class QueueStats(BaseModel):
 
 class Stats(BaseModel):
     queues: list[QueueStats]
+
+
+class WorkerOut(BaseModel):
+    worker_id: str
+    running: int
+    succeeded: int
+    failed: int
+    last_seen: datetime
+
+
+class ThroughputBucket(BaseModel):
+    start: datetime
+    succeeded: int
+    failed: int
+
+
+class Throughput(BaseModel):
+    bucket_s: int
+    buckets: list[ThroughputBucket]

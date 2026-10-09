@@ -12,3 +12,10 @@ dist/
 build/
 *.egg-info/
 .DS_Store
+
+# Built dashboard (npm run build in web/) and web tooling output
+src/jobq/static/web/
+node_modules/
+web/test-results/
+web/playwright-report/
+web/coverage/
